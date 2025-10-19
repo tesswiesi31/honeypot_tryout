@@ -1,0 +1,113 @@
+body {
+  font-family: monospace;
+  background: #121212;
+  color: #0f0;
+  margin: 40px auto;
+  max-width: 1000px;
+  line-height: 1.5;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #0f0;
+}
+
+.profiles {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.card {
+  width: 220px;
+  text-align: center;
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 6px 20px rgba(0, 255, 0, 0.2);
+}
+
+.card img {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #0f0;
+}
+
+.name {
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f0;
+}
+
+.meta {
+  margin-top: 10px;
+  color: #0c0;
+  font-size: 13px;
+}
+
+a.profile-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.censor-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.censor-row img {
+  width: 150px;
+  border-radius: 8px;
+  border: 1px solid #0f0;
+}
+
+.login-form {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 400px;
+  margin: 50px auto;
+}
+
+.login-form h2 {
+  color: #0f0;
+  text-align: center;
+}
+
+.login-form input {
+  width: 100%;
+  margin: 8px 0;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #0f0;
+  background: #121212;
+  color: #0f0;
+}
+
+.login-form button {
+  width: 100%;
+  padding: 10px;
+  background: #0f0;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.login-form button:hover {
+  background: #0c0;
+}
