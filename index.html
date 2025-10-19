@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Honeypot</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Honeypot</h1>
+    </header>
+    <p>Select a profile to view more information.</p>
+    <div class="profiles">
+      <div class="card">
+        <a class="profile-link" href="/Jack"
+          ><img src="/static/jack.jpg" />
+          <div class="name">Jack</div>
+          <div class="meta">6 - Playful young boy</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/Emi"
+          ><img src="/static/emi.jpg" />
+          <div class="name">Emi</div>
+          <div class="meta">5 - loves to draw</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/Noah"
+          ><img src="/static/noah.jpg" />
+          <div class="name">Noah</div>
+          <div class="meta">7 - loves playing soccer</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/Lexi"
+          ><img src="/static/lexi.jpg" />
+          <div class="name">Lexi</div>
+          <div class="meta">4 - likes horses</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/John"
+          ><img src="/static/john.jpg" />
+          <div class="name">John</div>
+          <div class="meta">9 - likes to play video games</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/Mark"
+          ><img src="/static/mark.jpg" />
+          <div class="name">Mark</div>
+          <div class="meta">10 - likes to play football</div></a
+        >
+      </div>
+      <div class="card">
+        <a class="profile-link" href="/Noelle"
+          ><img src="/static/noelle.jpg" />
+          <div class="name">Noelle</div>
+          <div class="meta">7 - loves nature</div></a
+        >
+      </div>
+    </div>
+    <script>
+      document.addEventListener("keydown", function (e) {
+        if (e.shiftKey && (e.key === "L" || e.key === "l")) {
+          window.location.href = "/login";
+        }
+      });
+    </script>
+  </body>
+</html>
