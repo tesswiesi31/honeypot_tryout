@@ -4,36 +4,25 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from collections import Counter, defaultdict
 
-from fastapi import FastAPI, Request, Response, Form, status
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, status
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.staticfiles import StaticFiles
 
-# --- Config / .env ---
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except:
-    pass
-
-APP_ENV    = os.getenv("APP_ENV","dev")
-ADMIN_USER = os.getenv("ADMIN_USERNAME","admin")
-ADMIN_PASS = os.getenv("ADMIN_PASSWORD","admin123")
-SECRET_KEY = os.getenv("SECRET_KEY","dev-secret-change-me")
-EVENT_LOG  = os.getenv("EVENT_LOG","events.jsonl")
+# --- Config ---
+APP_ENV = os.getenv("APP_ENV", "dev")
+ADMIN_USER = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASS = os.getenv("ADMIN_PASSWORD", "admin123")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+EVENT_LOG = os.getenv("EVENT_LOG", "events.jsonl")
 
 # Telegram
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN","")
-TELEGRAM_CHAT  = os.getenv("TELEGRAM_CHAT","")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT = os.getenv("TELEGRAM_CHAT", "")
 
 # --- App setup ---
 Path(EVENT_LOG).touch(exist_ok=True)
-
 app = FastAPI(title="tryout")
-# Serve static files from root
-app.mount("/static", StaticFiles(directory="."), name="static")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if APP_ENV=="dev" else [],
@@ -42,46 +31,84 @@ app.add_middleware(
 )
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", session_cookie="hp_admin")
 
+# --- Honey routes ---
 HONEY_ROUTES = {"/Jack","/Emi","/Noah","/Lexi","/John","/Mark","/Noelle"}
 
+# --- Utility functions ---
 def now(): return datetime.now(tz=timezone.utc).isoformat()
 def sid(req: Request): return req.cookies.get("hp_sid") or str(uuid4())
-def ip(req: Request): return (req.headers.get("x-forwarded-for","").split(",")[0].strip() or (req.client.host if req.client else "0.0.0.0"))
-def log(event): open(EVENT_LOG,"a",encoding="utf-8").write(json.dumps(event,ensure_ascii=False)+"\n")
-def is_logged_in(req: Request): return req.session.get("user")==ADMIN_USER
+def ip(req: Request): return req.headers.get("x-forwarded-for","").split(",")[0].strip() or (req.client.host if req.client else "0.0.0.0")
+def log(event: dict): open(EVENT_LOG,"a",encoding="utf-8").write(json.dumps(event,ensure_ascii=False)+"\n")
+def is_logged_in(req: Request): return req.session.get("user") == ADMIN_USER
 
 def notify_telegram(msg: str):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT: return
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": msg}, timeout=3)
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                      json={"chat_id": TELEGRAM_CHAT, "text": msg}, timeout=3)
     except Exception as e:
         print("Telegram notify failed:", e)
 
-# --- Middleware ---
+# --- Middleware for logging ---
 @app.middleware("http")
 async def logger(req: Request, call_next):
     s = sid(req)
     route = req.url.path
-    log({"ts":now(),"kind":"request","sid":s,"ip":ip(req),"route":route,"method":req.method})
-    res: Response = await call_next(req)
-    log({"ts":now(),"kind":"response","sid":s,"ip":ip(req),"route":route,"status":res.status_code,"is_honey":route in HONEY_ROUTES})
-    if "hp_sid" not in req.cookies: res.set_cookie("hp_sid",s,httponly=True,samesite="lax")
+    log({"ts": now(), "kind": "request", "sid": s, "ip": ip(req), "route": route, "method": req.method})
+    res = await call_next(req)
+    log({"ts": now(), "kind": "response", "sid": s, "ip": ip(req), "route": route, "status": res.status_code, "is_honey": route in HONEY_ROUTES})
+    if "hp_sid" not in req.cookies:
+        res.set_cookie("hp_sid", s, httponly=True, samesite="lax")
     return res
 
+# --- Serve HTML files from root ---
+def serve_html(filename: str, replacements: dict = None):
+    path = Path(filename)
+    if path.exists():
+        content = path.read_text(encoding="utf-8")
+        if replacements:
+            for k, v in replacements.items():
+                content = content.replace(k, v)
+        return HTMLResponse(content)
+    return HTMLResponse("<h1>File not found</h1>", status_code=404)
+
+# --- Index & profiles ---
+@app.get("/", response_class=HTMLResponse)
+def index(): return serve_html("index.html")
+
+PROFILES = ["Jack","Emi","Noah","Lexi","John","Mark","Noelle"]
+
+for p in PROFILES:
+    def make_profile_route(profile_name):
+        async def profile(request: Request):
+            notify_telegram(f"🚨 ALERT: Someone accessed profile {profile_name}! IP: {ip(request)}")
+            return serve_html(f"{profile_name.lower()}.html")
+        return profile
+    app.get(f"/{p}")(make_profile_route(p))
+
+# --- Event tracking ---
+@app.post("/event")
+async def track_event(request: Request):
+    try: data = await request.json()
+    except: data = {}
+    s = sid(request)
+    e = {"ts": now(), "kind":"client", "sid": s, "ip": ip(request),
+         "action": str(data.get("action")), "label": str(data.get("label"))}
+    log(e)
+    if e["action"]=="click" and e["label"] in PROFILES:
+        notify_telegram(f"👆 Click detected: {e['label']} | IP: {e['ip']}")
+    return {"ok": True}
+
 # --- Login / Logout ---
-LOGIN_FORM='''<h2>Login</h2>{msg}<form method="post"><label for="username">Username:</label><input name="username"/><label for="password">Password:</label>
-<input type="password" name="password"/><button>Login</button></form>'''
-
 @app.get("/login", response_class=HTMLResponse)
-def login_form(): return LOGIN_FORM.format(msg="")
+def login_form(): return serve_html("login.html", {"{error_msg}": ""})
 
-@app.post("/login", response_class=HTMLResponse)
-def login(username: str=Form(...), password: str=Form(...), request: Request=None):
-    if username==ADMIN_USER and password==ADMIN_PASS:
-        request.session["user"]=ADMIN_USER
+@app.post("/login")
+def login(username: str = Form(...), password: str = Form(...), request: Request = None):
+    if username == ADMIN_USER and password == ADMIN_PASS:
+        request.session["user"] = ADMIN_USER
         return RedirectResponse("/_admin/logs", status_code=status.HTTP_303_SEE_OTHER)
-    return LOGIN_FORM.format(msg="<p style='color:red'>Login failed</p>")
+    return serve_html("login.html", {"{error_msg}": "<p style='color:red'>Login failed</p>"})
 
 @app.get("/logout")
 def logout(request: Request):
@@ -91,23 +118,20 @@ def logout(request: Request):
 # --- Admin utilities ---
 def _parse_ts(s: str):
     try: return datetime.fromisoformat(s.replace("Z","+00:00"))
-    except Exception: return None
+    except: return None
 
 @app.get("/_admin/logs", response_class=HTMLResponse)
-def logs(request: Request, tail: int = 200):
+def admin_logs(request: Request, tail: int = 200):
     if not is_logged_in(request): return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     p = Path(EVENT_LOG)
-    if not p.exists(): return "<pre>(no events yet)</pre>"
-    lines = p.read_text(encoding="utf-8").splitlines()[-tail:]
-    out = [f"<div><code>{ln}</code></div>" for ln in lines]
-    return f"<html><body style='font-family:monospace;max-width:980px;margin:20px auto;background:#121212;color:#0f0'><p><a href='/_admin/stats'>Stats</a> · <a href='/_admin/export'>CSV Export</a> · <a href='/logout'>Logout</a></p><h2>Last {tail} events</h2>{''.join(out)}</body></html>"
+    lines = p.read_text(encoding="utf-8").splitlines()[-tail:] if p.exists() else []
+    return serve_html("logs.html", {"{events}": "".join(f"<div><code>{ln}</code></div>" for ln in lines)})
 
 @app.get("/_admin/stats", response_class=HTMLResponse)
-def stats(request: Request, hours: int = 168):
+def admin_stats(request: Request):
     if not is_logged_in(request): return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     p = Path(EVENT_LOG)
-    if not p.exists(): return "<pre>(no events yet)</pre>"
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=168)
 
     per_ip = Counter()
     per_route = Counter()
@@ -140,28 +164,12 @@ def stats(request: Request, hours: int = 168):
     ip_details = "".join(f"<tr><td>{ip}</td><td>{len(sessions_per_ip[ip])}</td><td>{last_seen[ip]}</td></tr>" for ip,_ in per_ip_sorted[:20])
     ip_details_html = f"<h3>Top IPs – Details</h3><table border='1' cellpadding='6'><tr><th>IP</th><th>Sessions</th><th>Last Seen (UTC)</th></tr>{ip_details}</table>"
 
-    body = "<p><a href='/_admin/logs'>Logs</a> · <a href='/_admin/export'>CSV Export</a> · <a href='/logout'>Logout</a></p>"
-    body += f"<p>Period: last {hours} hours</p>"
-    body += table('Top IPs (Event Count)', per_ip_sorted)
-    body += table('Top Routes', per_route_sorted)
-    body += table('Top Click Labels', clicks_sorted)
-    body += ip_details_html
-
-    return f"<html><body style='font-family:monospace;max-width:980px;margin:20px auto;background:#121212;color:#0f0'>{body}</body></html>"
+    return serve_html("stats.html", {"{tables}": table('Top IPs (Event Count)', per_ip_sorted)+table('Top Routes', per_route_sorted)+table('Top Click Labels', clicks_sorted)+ip_details_html})
 
 @app.get("/_admin/export")
-def export_csv(request: Request, limit: int = 10000):
+def admin_export(request: Request, limit: int = 10000):
     if not is_logged_in(request): return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     p = Path(EVENT_LOG)
-    if not p.exists(): return PlainTextResponse("", media_type="text/csv")
-    lines = p.read_text(encoding="utf-8").splitlines()[-limit:]
-    cols = ["ts","kind","ip","sid","route","method","status","action","label","ua","accept_language","referrer","is_honey"]
-    out = [",".join(cols)]
-    for ln in lines:
-        try: obj = json.loads(ln)
-        except: continue
-        row = [str(obj.get(c,"")).replace(",",";") for c in cols]
-        out.append(",".join(row))
-    csv_data = "\n".join(out)
-    headers = {"Content-Disposition": 'attachment; filename="events_export.csv"'}
-    return PlainTextResponse(csv_data, media_type="text/csv", headers=headers)
+    lines = p.read_text(encoding="utf-8").splitlines()[-limit:] if p.exists() else []
+    csv_data = "\n".join(lines)
+    return PlainTextResponse(csv_data, media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="events_export.csv"'})
