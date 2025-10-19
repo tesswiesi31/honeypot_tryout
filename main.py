@@ -27,6 +27,27 @@ app.add_middleware(
 )
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", session_cookie="hp_admin")
 
+PROFILE_NAMES = ["Jack", "Emi", "Noah", "Lexi", "John", "Mark", "Noelle"]
+
+AGES = {
+    "Jack": 6,
+    "Emi": 5,
+    "Noah": 7,
+    "Lexi": 4,
+    "John": 9,
+    "Mark": 10,
+    "Noelle": 7
+}
+
+BIOS = {
+    "Jack": "Playful young boy who loves adventures.",
+    "Emi": "Loves to draw and color fun pictures.",
+    "Noah": "Enjoys playing soccer with friends.",
+    "Lexi": "Likes horses and outdoor activities.",
+    "John": "Loves to play video games.",
+    "Mark": "Enjoys playing football with his team.",
+    "Noelle": "Loves nature and exploring the outdoors."
+}
 
 # --- Helpers ---
 def now_iso(): return datetime.now(tz=timezone.utc).isoformat()
