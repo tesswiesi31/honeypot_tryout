@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin - Logs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <p><a href="/_admin/stats">Stats</a> · <a href="/_admin/export">CSV Export</a> · <a href="/logout">Logout</a></p>
+  <h2>Last {{ tail }} events</h2>
+  <div class="logs">
+    {% for ev in events %}
+      <div class="log-entry"><pre>{{ ev | tojson(indent=2) }}</pre></div>
+    {% endfor %}
+  </div>
+</body>
+</html>
