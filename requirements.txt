@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+requests
+python-dotenv
+beautifulsoup4
+jinja2
+python-multipart
